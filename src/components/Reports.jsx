@@ -145,13 +145,20 @@ export default function Reports({ transactions }) {
     // elérhető évek a szűrőhöz
     const years = Array.from(yearsSet).sort((a, b) => b - a);
 
-    // havi tranzakciók lista (időrendben visszafelé)
-    const transactionsByMonth = Array.from(monthTxMap.values()).sort(
-      (a, b) => {
+    // havi tranzakciók lista (hónapok újabbtól régebbig, tranzakciók dátum szerint)
+    const transactionsByMonth = Array.from(monthTxMap.values())
+      .map(group => ({
+        ...group,
+        transactions: group.transactions
+          .slice()
+          .sort(
+            (a, b) => normalizeDate(b.date) - normalizeDate(a.date)
+          )
+      }))
+      .sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         return b.monthIdx - a.monthIdx;
-      }
-    );
+      });
 
     return {
       monthIncome,
