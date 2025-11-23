@@ -227,16 +227,17 @@ export default function Reports({ transactions }) {
       return;
     }
 
-    // Csak kiadás + megtakarítás (mint a havi bontásnál)
+    // Bevétel + kiadás + megtakarítás összegei kategóriánként
     const catMap = new Map();
     for (const tx of filteredTransactions) {
-      if (tx.type !== 'expense' && tx.type !== 'saving_deposit') continue;
       const categoryName =
         tx.type === 'saving_deposit'
           ? 'Megtakarítás'
           : tx.category || 'Egyéb';
       const amount = Number(tx.amount) || 0;
-      catMap.set(categoryName, (catMap.get(categoryName) || 0) + amount);
+      const signedAmount =
+        tx.type === 'income' ? amount : amount; // bevétel is pozitív, többi összevontan megy
+      catMap.set(categoryName, (catMap.get(categoryName) || 0) + signedAmount);
     }
 
     if (!catMap.size) {
