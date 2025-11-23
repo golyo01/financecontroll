@@ -25,7 +25,9 @@ function toDateInputValue(date) {
 
 export default function Reports({ transactions }) {
   const [yearFilter, setYearFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('all');
   const [copyMsg, setCopyMsg] = useState('');
+  const [periodCopyMsg, setPeriodCopyMsg] = useState('');
 
   // szerkesztés állapot
   const [editingId, setEditingId] = useState(null);
@@ -191,11 +193,44 @@ export default function Reports({ transactions }) {
     }
   };
 
-  // Év szűrő a tranzakciólistára
-  const filteredTxByMonth =
-    yearFilter === 'all'
-      ? transactionsByMonth
-      : transactionsByMonth.filter(m => m.year === Number(yearFilter));
+  // Elérhető hónapok a kiválasztott évhez
+  const monthsForYear = useMemo(() => {
+    if (yearFilter === 'all') return [];
+    const months = transactionsByMonth
+      .filter(m => m.year === Number(yearFilter))
+      .map(m => m.monthIdx);
+    return Array.from(new Set(months)).sort((a, b) => a - b);
+  }, [transactionsByMonth, yearFilter]);
+
+  // Év + hónap szűrő a tranzakciólistára
+  const filteredTxByMonth = useMemo(() => {
+    let list = transactionsByMonth;
+    if (yearFilter !== 'all') {
+      list = list.filter(m => m.year === Number(yearFilter));
+    }
+    if (monthFilter !== 'all') {
+      list = list.filter(m => m.monthIdx === Number(monthFilter));
+    }
+    return list;
+  }, [transactionsByMonth, yearFilter, monthFilter]);
+
+  const copyPeriodFilter = async () => {
+    const yearText = yearFilter === 'all' ? 'Összes év' : String(yearFilter);
+    const monthText =
+      monthFilter === 'all'
+        ? 'Összes hónap'
+        : `${String(Number(monthFilter) + 1).padStart(2, '0')}. hónap`;
+    const text = `Év: ${yearText}, Hónap: ${monthText}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setPeriodCopyMsg('Kimásolva');
+      setTimeout(() => setPeriodCopyMsg(''), 2000);
+    } catch (err) {
+      console.error('Másolási hiba:', err);
+      setPeriodCopyMsg('Nem sikerült másolni');
+      setTimeout(() => setPeriodCopyMsg(''), 2000);
+    }
+  };
 
   // === Szerkesztés / törlés logika ===
 
@@ -391,20 +426,55 @@ export default function Reports({ transactions }) {
             >
               Tranzakciólista havi bontásban
             </div>
-            <div>
-              <select
-                className="input"
-                style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
-                value={yearFilter}
-                onChange={e => setYearFilter(e.target.value)}
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.4rem',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                <select
+                  className="input"
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                  value={yearFilter}
+                  onChange={e => {
+                    setYearFilter(e.target.value);
+                    setMonthFilter('all');
+                  }}
+                >
+                  <option value="all">Összes év</option>
+                  {years.map(y => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="input"
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                  value={monthFilter}
+                  onChange={e => setMonthFilter(e.target.value)}
+                  disabled={yearFilter === 'all'}
+                >
+                  <option value="all">Összes hónap</option>
+                  {monthsForYear.map(m => (
+                    <option key={m} value={m}>
+                      {String(m + 1).padStart(2, '0')}. hónap
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {periodCopyMsg && (
+                <span className="small text-muted">{periodCopyMsg}</span>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={copyPeriodFilter}
               >
-                <option value="all">Összes év</option>
-                {years.map(y => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
+                Másolom
+              </button>
             </div>
           </div>
 
