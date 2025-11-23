@@ -7,12 +7,21 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 
-export default function AuthGate({ children }) {
+export default function AuthGate({
+  children,
+  householdId,
+  households = [],
+  onSelectHousehold = () => {},
+  onAddHousehold = () => {},
+  onLeaveHousehold = () => {}
+}) {
   const [mode, setMode] = useState('login');
   const [loading, setLoading] = useState(false);
   const [userState, setUserState] = useState(() => auth.currentUser);
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [newHouseholdId, setNewHouseholdId] = useState('');
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => setUserState(u));
@@ -132,27 +141,134 @@ export default function AuthGate({ children }) {
 
   return (
     <div className="app-shell">
-      <div className="app-header">
-        <div className="app-title">Pénzügyi Tervező</div>
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.4rem',
-            alignItems: 'center'
-          }}
-        >
-          <span className="small text-muted">{userState.email}</span>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              signOut(auth);
+        <div className="app-header">
+          <div className="app-title">Pénzügyi Tervező</div>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.4rem',
+              alignItems: 'center',
+              position: 'relative'
             }}
           >
-            Kilépés
-          </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setMenuOpen(open => !open)}
+            >
+              Fiókom
+            </button>
+            {menuOpen && (
+              <div
+                className="card"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 0.5rem)',
+                  right: 0,
+                  minWidth: '280px',
+                  zIndex: 10
+                }}
+              >
+                <div className="card-header">
+                  <div>
+                    <div className="card-title">Fiók & háztartások</div>
+                    <div className="card-subtitle small">
+                      {userState.email}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      signOut(auth);
+                    }}
+                  >
+                    Kilépés
+                  </button>
+                </div>
+
+                <div className="card-body" style={{ display: 'grid', gap: '0.5rem' }}>
+                  <div>
+                    <div className="small text-muted">Aktív háztartás</div>
+                    <div style={{ fontWeight: 500 }}>
+                      {householdId || 'Nincs kiválasztva'}
+                    </div>
+                    {householdId && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ marginTop: '0.35rem' }}
+                        onClick={() => {
+                          onLeaveHousehold();
+                          setMenuOpen(false);
+                        }}
+                      >
+                        Kilépés a háztartásból
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="small text-muted">
+                      Háztartás váltása
+                    </div>
+                    {households.length === 0 && (
+                      <div className="small text-muted">
+                        Még nincs felvéve háztartás.
+                      </div>
+                    )}
+                    {households.length > 0 && (
+                      <div style={{ display: 'grid', gap: '0.35rem' }}>
+                        {households.map(id => (
+                          <button
+                            key={id}
+                            className="btn btn-secondary"
+                            style={{
+                              justifyContent: 'space-between',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            onClick={() => {
+                              onSelectHousehold(id);
+                              setMenuOpen(false);
+                            }}
+                          >
+                            <span>{id}</span>
+                            {householdId === id && (
+                              <span className="chip">Aktív</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="small text-muted">
+                      Új háztartás hozzáadása
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.25rem' }}>
+                      <input
+                        className="input"
+                        placeholder="Háztartás azonosító"
+                        value={newHouseholdId}
+                        onChange={e => setNewHouseholdId(e.target.value)}
+                      />
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => {
+                          onAddHousehold(newHouseholdId);
+                          setNewHouseholdId('');
+                          setMenuOpen(false);
+                        }}
+                      >
+                        Hozzáadás
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+        {children}
       </div>
-      {children}
-    </div>
-  );
+    );
 }
