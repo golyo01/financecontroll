@@ -101,19 +101,29 @@ function TrendChart({ data }) {
   const minVal = Math.min(...values);
   const range = maxVal - minVal || 1;
 
+  const xPos = index =>
+    padding +
+    (data.length === 1
+      ? (width - 2 * padding) / 2
+      : (index / (data.length - 1)) * (width - 2 * padding));
+
   const points = data
     .map((p, index) => {
-      const x =
-        padding +
-        (data.length === 1
-          ? (width - 2 * padding) / 2
-          : (index / (data.length - 1)) * (width - 2 * padding));
+      const x = xPos(index);
       const norm = (p.value - minVal) / range;
       const y =
         height - padding - norm * (height - 2 * padding); // fentről lefelé
       return `${x},${y}`;
     })
     .join(' ');
+
+  const tickCount = Math.min(4, data.length);
+  const ticks =
+    tickCount === 1
+      ? [0]
+      : Array.from({ length: tickCount }, (_, i) =>
+          Math.round((i * (data.length - 1)) / (tickCount - 1))
+        );
 
   return (
     <svg
@@ -126,6 +136,46 @@ function TrendChart({ data }) {
         strokeWidth="2"
         points={points}
       />
+      <line
+        x1={padding}
+        x2={width - padding}
+        y1={height - padding}
+        y2={height - padding}
+        stroke="currentColor"
+        strokeWidth="1"
+        opacity="0.6"
+      />
+      {ticks.map(index => {
+        const x = xPos(index);
+        const label = (data[index].date instanceof Date
+          ? data[index].date
+          : new Date(data[index].date)
+        ).toLocaleDateString('hu-HU', {
+          year: '2-digit',
+          month: '2-digit',
+          day: '2-digit'
+        });
+        return (
+          <g key={index}>
+            <line
+              x1={x}
+              x2={x}
+              y1={height - padding}
+              y2={height - padding + 4}
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+            <text
+              x={x}
+              y={height - padding + 12}
+              fontSize="10"
+              textAnchor="middle"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

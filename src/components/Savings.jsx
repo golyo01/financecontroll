@@ -41,13 +41,15 @@ function SavingsChart({ snapshots }) {
   const minVal = Math.min(...values);
   const range = maxVal - minVal || 1;
 
+  const xPos = index =>
+    padding +
+    (sorted.length === 1
+      ? (width - 2 * padding) / 2
+      : (index / (sorted.length - 1)) * (width - 2 * padding));
+
   const points = sorted
     .map((s, index) => {
-      const x =
-        padding +
-        (sorted.length === 1
-          ? (width - 2 * padding) / 2
-          : (index / (sorted.length - 1)) * (width - 2 * padding));
+      const x = xPos(index);
 
       const norm = (Number(s.value) - minVal) / range;
       const y =
@@ -55,6 +57,14 @@ function SavingsChart({ snapshots }) {
       return `${x},${y}`;
     })
     .join(' ');
+
+  const tickCount = Math.min(4, sorted.length);
+  const ticks =
+    tickCount === 1
+      ? [0]
+      : Array.from({ length: tickCount }, (_, i) =>
+          Math.round((i * (sorted.length - 1)) / (tickCount - 1))
+        );
 
   return (
     <div style={{ marginTop: '0.5rem' }}>
@@ -68,6 +78,47 @@ function SavingsChart({ snapshots }) {
           strokeWidth="2"
           points={points}
         />
+        <line
+          x1={padding}
+          x2={width - padding}
+          y1={height - padding}
+          y2={height - padding}
+          stroke="currentColor"
+          strokeWidth="1"
+          opacity="0.6"
+        />
+        {ticks.map(index => {
+          const x = xPos(index);
+          const label = (sorted[index].createdAt &&
+          sorted[index].createdAt.toDate
+            ? sorted[index].createdAt.toDate()
+            : new Date()
+          ).toLocaleDateString('hu-HU', {
+            year: '2-digit',
+            month: '2-digit',
+            day: '2-digit'
+          });
+          return (
+            <g key={index}>
+              <line
+                x1={x}
+                x2={x}
+                y1={height - padding}
+                y2={height - padding + 4}
+                stroke="currentColor"
+                strokeWidth="1"
+              />
+              <text
+                x={x}
+                y={height - padding + 12}
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
       </svg>
       <div className="small text-muted">
         Érték alakulása időben (naplózott módosítások alapján).
@@ -84,6 +135,7 @@ export default function Savings({ householdId }) {
   const [newName, setNewName] = useState('');
   const [newStart, setNewStart] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pendingValues, setPendingValues] = useState({});
 
   // szerkesztés állapot
   const [editingId, setEditingId] = useState(null);
@@ -298,10 +350,11 @@ export default function Savings({ householdId }) {
     }
   };
 
-  // ⚡ gyors frissítés csak az aktuális piaci értékre (normál nézetben)
-  const handleUpdateCurrentValue = async (id, value) => {
-    const numeric = parseFloat(value);
-    if (Number.isNaN(numeric)) return;
+  // Mentés gombbal frissítjük az aktuális értéket
+  const saveCurrentValue = async id => {
+    const raw = pendingValues[id];
+    const numeric = raw === undefined ? null : parseFloat(raw);
+    if (numeric === null || Number.isNaN(numeric)) return;
 
     const accStats = accountsWithStats.find(a => a.id === id);
     const capital = accStats ? accStats.capital : 0;
@@ -311,8 +364,12 @@ export default function Savings({ householdId }) {
         currentValue: numeric
       });
 
-      // logoljuk a módosítást is
       await logSnapshot(id, capital, numeric);
+      setPendingValues(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
     } catch (err) {
       console.error('Nem sikerült frissíteni az aktuális értéket:', err);
     }
@@ -536,12 +593,27 @@ export default function Savings({ householdId }) {
                     className="input"
                     type="number"
                     step="0.01"
-                    value={acc.currentValue}
+                    value={
+                      pendingValues[acc.id] !== undefined
+                        ? pendingValues[acc.id]
+                        : acc.currentValue ?? ''
+                    }
                     onChange={e =>
-                      handleUpdateCurrentValue(acc.id, e.target.value)
+                      setPendingValues(prev => ({
+                        ...prev,
+                        [acc.id]: e.target.value
+                      }))
                     }
                     style={{ marginBottom: '0.25rem' }}
                   />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: '100%', marginBottom: '0.25rem' }}
+                    onClick={() => saveCurrentValue(acc.id)}
+                  >
+                    Mentés
+                  </button>
                   <div
                     className={
                       acc.profit >= 0

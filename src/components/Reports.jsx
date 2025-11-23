@@ -227,17 +227,22 @@ export default function Reports({ transactions }) {
       return;
     }
 
-    // Bevétel + kiadás + megtakarítás összegei kategóriánként
-    const catMap = new Map();
+    // Bevétel + kiadás + megtakarítás összegei kategória és típus bontásban
+    const catMap = new Map(); // kulcs: `${categoryName}__${typeLabel}`
     for (const tx of filteredTransactions) {
+      const typeLabel =
+        tx.type === 'income'
+          ? 'Bevétel'
+          : tx.type === 'saving_deposit'
+          ? 'Megtakarítás'
+          : 'Kiadás';
       const categoryName =
         tx.type === 'saving_deposit'
           ? 'Megtakarítás'
           : tx.category || 'Egyéb';
       const amount = Number(tx.amount) || 0;
-      const signedAmount =
-        tx.type === 'income' ? amount : amount; // bevétel is pozitív, többi összevontan megy
-      catMap.set(categoryName, (catMap.get(categoryName) || 0) + signedAmount);
+      const key = `${categoryName}__${typeLabel}`;
+      catMap.set(key, (catMap.get(key) || 0) + amount);
     }
 
     if (!catMap.size) {
@@ -247,7 +252,10 @@ export default function Reports({ transactions }) {
     }
 
     const rows = Array.from(catMap.entries())
-      .map(([name, value]) => `${name}: ${formatFt(value)}`)
+      .map(([key, value]) => {
+        const [name, typeLabel] = key.split('__');
+        return `${name} (${typeLabel}): ${formatFt(value)}`;
+      })
       .join('\n');
 
     try {
