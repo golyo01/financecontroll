@@ -214,15 +214,43 @@ export default function Reports({ transactions }) {
     return list;
   }, [transactionsByMonth, yearFilter, monthFilter]);
 
+  const filteredTransactions = useMemo(
+    () =>
+      filteredTxByMonth.flatMap(group => group.transactions || []),
+    [filteredTxByMonth]
+  );
+
   const copyPeriodFilter = async () => {
-    const yearText = yearFilter === 'all' ? 'Összes év' : String(yearFilter);
-    const monthText =
-      monthFilter === 'all'
-        ? 'Összes hónap'
-        : `${String(Number(monthFilter) + 1).padStart(2, '0')}. hónap`;
-    const text = `Év: ${yearText}, Hónap: ${monthText}`;
+    if (!filteredTransactions.length) {
+      setPeriodCopyMsg('Nincs másolható adat');
+      setTimeout(() => setPeriodCopyMsg(''), 2000);
+      return;
+    }
+
+    // Csak kiadás + megtakarítás (mint a havi bontásnál)
+    const catMap = new Map();
+    for (const tx of filteredTransactions) {
+      if (tx.type !== 'expense' && tx.type !== 'saving_deposit') continue;
+      const categoryName =
+        tx.type === 'saving_deposit'
+          ? 'Megtakarítás'
+          : tx.category || 'Egyéb';
+      const amount = Number(tx.amount) || 0;
+      catMap.set(categoryName, (catMap.get(categoryName) || 0) + amount);
+    }
+
+    if (!catMap.size) {
+      setPeriodCopyMsg('Nincs másolható adat');
+      setTimeout(() => setPeriodCopyMsg(''), 2000);
+      return;
+    }
+
+    const rows = Array.from(catMap.entries())
+      .map(([name, value]) => `${name}: ${formatFt(value)}`)
+      .join('\n');
+
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(rows);
       setPeriodCopyMsg('Kimásolva');
       setTimeout(() => setPeriodCopyMsg(''), 2000);
     } catch (err) {
