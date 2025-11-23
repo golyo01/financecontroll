@@ -25,6 +25,7 @@ function toDateInputValue(date) {
 
 export default function Reports({ transactions }) {
   const [yearFilter, setYearFilter] = useState('all');
+  const [copyMsg, setCopyMsg] = useState('');
 
   // szerkesztés állapot
   const [editingId, setEditingId] = useState(null);
@@ -164,14 +165,31 @@ export default function Reports({ transactions }) {
       monthIncome,
       monthExpense,
       monthSavings,
-      monthTotalOut,
-      monthRemaining,
-      monthRemainingClass,
-      monthlyCategorySummary,
-      years,
-      transactionsByMonth
-    };
+        monthTotalOut,
+        monthRemaining,
+        monthRemainingClass,
+        monthlyCategorySummary,
+        years,
+        transactionsByMonth
+      };
   }, [transactions]);
+
+  const copyCategories = async () => {
+    if (!monthlyCategorySummary.length) return;
+    const rows = monthlyCategorySummary.map(
+      cat => `${cat.name}: ${formatFt(cat.value)}`
+    );
+    const text = rows.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyMsg('Kimásolva');
+      setTimeout(() => setCopyMsg(''), 2000);
+    } catch (err) {
+      console.error('Másolási hiba:', err);
+      setCopyMsg('Nem sikerült másolni');
+      setTimeout(() => setCopyMsg(''), 2000);
+    }
+  };
 
   // Év szűrő a tranzakciólistára
   const filteredTxByMonth =
@@ -303,13 +321,34 @@ export default function Reports({ transactions }) {
         <section style={{ marginBottom: '1.5rem' }}>
           <div
             style={{
-              fontSize: '0.9rem',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '0.5rem'
             }}
           >
-            Kategória bontás (aktuális hónap)
+            <div
+              style={{
+                fontSize: '0.9rem',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase'
+              }}
+            >
+              Kategória bontás (aktuális hónap)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              {copyMsg && (
+                <span className="small text-muted">{copyMsg}</span>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={copyCategories}
+                disabled={!monthlyCategorySummary.length}
+              >
+                Másolom
+              </button>
+            </div>
           </div>
 
           {monthlyCategorySummary.length === 0 ? (

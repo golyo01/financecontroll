@@ -37,7 +37,6 @@ export default function TransactionForm({ householdId }) {
 
   // 🔹 Kategóriák
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [newCategory, setNewCategory] = useState('');
 
   // 🔹 Megtakarítási számlák
   const [savingsAccounts, setSavingsAccounts] = useState([]);
@@ -99,39 +98,12 @@ export default function TransactionForm({ householdId }) {
     return () => unsub();
   }, [householdId, savingsAccountId]);
 
-  // Új kategória mentése
-  const handleAddCategory = async () => {
-    if (!householdId) return;
-
-    const name = newCategory.trim();
-    if (!name) return;
-
-    if (categories.includes(name)) {
-      setCategory(name);
-      setNewCategory('');
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, 'categories'), {
-        householdId,
-        name,
-        createdAt: serverTimestamp()
-      });
-      setCategory(name);
-      setNewCategory('');
-    } catch (err) {
-      console.error('Kategória mentési hiba:', err);
-    }
-  };
-
   const resetForm = () => {
     setType('expense');
     setAmount('');
     setCategory('');
     setDescription('');
     setDate(new Date().toISOString().slice(0, 10));
-    setNewCategory('');
     setSavingsAccountId('');
   };
 
@@ -231,29 +203,6 @@ export default function TransactionForm({ householdId }) {
                 </option>
               ))}
             </select>
-
-            {/* Új kategória hozzáadása */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginTop: '0.35rem'
-              }}
-            >
-              <input
-                className="input"
-                placeholder="Új kategória neve"
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleAddCategory}
-              >
-                Hozzáadás
-              </button>
-            </div>
           </div>
 
           <input
