@@ -33,6 +33,7 @@ export default function TransactionForm({ householdId }) {
     new Date().toISOString().slice(0, 10)
   );
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
 
   // 🔹 Kategóriák
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -124,6 +125,16 @@ export default function TransactionForm({ householdId }) {
     }
   };
 
+  const resetForm = () => {
+    setType('expense');
+    setAmount('');
+    setCategory('');
+    setDescription('');
+    setDate(new Date().toISOString().slice(0, 10));
+    setNewCategory('');
+    setSavingsAccountId('');
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
     if (!householdId) return;
@@ -155,9 +166,9 @@ export default function TransactionForm({ householdId }) {
         createdAt: serverTimestamp()
       });
 
-      setAmount('');
-      setDescription('');
-      // kategóriát és dátumot meghagyjuk
+      resetForm();
+      setSuccess('Mentve');
+      setTimeout(() => setSuccess(''), 2000);
     } finally {
       setLoading(false);
     }
@@ -174,6 +185,14 @@ export default function TransactionForm({ householdId }) {
         </div>
       </div>
       <form onSubmit={handleSubmit}>
+        {success && (
+          <div
+            className="small"
+            style={{ color: '#16a34a', marginBottom: '0.35rem' }}
+          >
+            {success}
+          </div>
+        )}
         {/* típus + összeg */}
         <div className="grid-2" style={{ marginBottom: '0.5rem' }}>
           <select

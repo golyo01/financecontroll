@@ -157,8 +157,8 @@ export default function App() {
 
           {tab === 'dashboard' && (
             <>
-              <Dashboard transactions={transactions} />
               <TransactionForm householdId={householdId} />
+              <Dashboard transactions={transactions} />
               {/* Itt már nincs tranzakció lista */}
             </>
           )}
