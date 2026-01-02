@@ -220,6 +220,44 @@ export default function Reports({ transactions }) {
     [filteredTxByMonth]
   );
 
+  const periodSummary = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    let savings = 0;
+
+    for (const tx of filteredTransactions) {
+      const amount = Number(tx.amount) || 0;
+      if (tx.type === 'income') {
+        income += amount;
+      } else if (tx.type === 'expense') {
+        expense += amount;
+      } else if (tx.type === 'saving_deposit') {
+        savings += amount;
+      }
+    }
+
+    const totalOut = expense + savings;
+    const remaining = income - totalOut;
+    const remainingClass =
+      remaining >= 0 ? 'amount-positive' : 'amount-negative';
+
+    return {
+      income,
+      expense,
+      savings,
+      totalOut,
+      remaining,
+      remainingClass
+    };
+  }, [filteredTransactions]);
+
+  const selectedPeriodLabel = useMemo(() => {
+    if (yearFilter === 'all') return 'Összes időszak';
+    if (monthFilter === 'all') return `${yearFilter}. (összes hónap)`;
+    const month = String(Number(monthFilter) + 1).padStart(2, '0');
+    return `${yearFilter}. ${month}.`;
+  }, [yearFilter, monthFilter]);
+
   const copyPeriodFilter = async () => {
     if (!filteredTransactions.length) {
       setPeriodCopyMsg('Nincs másolható adat');
@@ -514,6 +552,60 @@ export default function Reports({ transactions }) {
               </button>
             </div>
           </div>
+
+          {yearFilter !== 'all' && filteredTransactions.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                padding: '0.75rem 0',
+                borderBottom: '1px solid #e5e7eb',
+                marginBottom: '0.75rem'
+              }}
+            >
+              <div>
+                <div className="small text-muted">Szűrt időszak</div>
+                <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
+                  {selectedPeriodLabel}
+                </div>
+                <div className="small text-muted">Bevétel</div>
+                <div className="amount-positive">
+                  + {formatFt(periodSummary.income).replace('-', '')}
+                </div>
+                <div
+                  className="small text-muted"
+                  style={{ marginTop: '0.4rem' }}
+                >
+                  Megtakarítás
+                </div>
+                <div className="amount-negative">
+                  - {formatFt(periodSummary.savings).replace('-', '')}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="small text-muted">Kiadás</div>
+                <div className="amount-negative">
+                  - {formatFt(periodSummary.expense).replace('-', '')}
+                </div>
+                <div className="small text-muted" style={{ marginTop: '0.4rem' }}>
+                  Kiadás + megtakarítás
+                </div>
+                <div className="amount-negative">
+                  - {formatFt(periodSummary.totalOut).replace('-', '')}
+                </div>
+                <div
+                  className={periodSummary.remainingClass}
+                  style={{ marginTop: '0.4rem' }}
+                >
+                  Összegzés:{' '}
+                  {periodSummary.remaining >= 0
+                    ? '+ ' + formatFt(periodSummary.remaining)
+                    : formatFt(periodSummary.remaining)}
+                </div>
+              </div>
+            </div>
+          )}
 
           {filteredTxByMonth.length === 0 ? (
             <div className="small text-muted">

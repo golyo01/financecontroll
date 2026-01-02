@@ -220,8 +220,21 @@ export default function Savings({ householdId }) {
   }, [householdId]);
 
   // 📊 Számlák tőkéjének kiszámítása (kezdőtőke + befizetések)
+  const orderedAccounts = useMemo(() => {
+    return accounts
+      .slice()
+      .sort((a, b) => {
+        const orderA =
+          a.order != null ? a.order : accounts.indexOf(a);
+        const orderB =
+          b.order != null ? b.order : accounts.indexOf(b);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+  }, [accounts]);
+
   const accountsWithStats = useMemo(() => {
-    return accounts.map(acc => {
+    return orderedAccounts.map(acc => {
       const base = Number(acc.startingAmount ?? 0) || 0;
 
       const deposits = savingTx
@@ -249,7 +262,30 @@ export default function Savings({ householdId }) {
         profitPct
       };
     });
-  }, [accounts, savingTx]);
+  }, [orderedAccounts, savingTx]);
+
+  // 📊 Összesített mutatók
+  const totals = useMemo(() => {
+    const sum = {
+      capital: 0,
+      current: 0
+    };
+
+    for (const acc of accountsWithStats) {
+      sum.capital += acc.capital;
+      sum.current += acc.currentValue ?? 0;
+    }
+
+    const profit = sum.current - sum.capital;
+    const profitPct = sum.capital > 0 ? (profit / sum.capital) * 100 : 0;
+
+    return {
+      capital: sum.capital,
+      current: sum.current,
+      profit,
+      profitPct
+    };
+  }, [accountsWithStats]);
 
   // 📝 helper: snapshot logolása minden módosításkor
   const logSnapshot = async (accountId, capital, value) => {
@@ -277,6 +313,13 @@ export default function Savings({ householdId }) {
 
     if (!name) return;
 
+    const nextOrder =
+      accounts.reduce(
+        (max, acc) =>
+          acc.order != null ? Math.max(max, acc.order) : max,
+        -1
+      ) + 1;
+
     setSaving(true);
     try {
       const ref = await addDoc(collection(db, 'savingsAccounts'), {
@@ -284,6 +327,7 @@ export default function Savings({ householdId }) {
         name,
         startingAmount: start,
         currentValue: start,
+        order: nextOrder,
         createdAt: serverTimestamp()
       });
 
@@ -379,6 +423,36 @@ export default function Savings({ householdId }) {
     setExpandedId(prev => (prev === id ? null : id));
   };
 
+  // 🔀 sorrend mozgatása
+  const moveAccount = async (id, direction) => {
+    const idx = orderedAccounts.findIndex(a => a.id === id);
+    if (idx === -1) return;
+
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= orderedAccounts.length) return;
+
+    const current = orderedAccounts[idx];
+    const target = orderedAccounts[targetIdx];
+
+    const currentOrder =
+      current.order != null ? current.order : idx;
+    const targetOrder =
+      target.order != null ? target.order : targetIdx;
+
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'savingsAccounts', current.id), {
+          order: targetOrder
+        }),
+        updateDoc(doc(db, 'savingsAccounts', target.id), {
+          order: currentOrder
+        })
+      ]);
+    } catch (err) {
+      console.error('Nem sikerült módosítani a sorrendet:', err);
+    }
+  };
+
   return (
     <div className="card">
       <div className="card-header">
@@ -416,6 +490,63 @@ export default function Savings({ householdId }) {
         </button>
       </form>
 
+      {/* Összegzés */}
+      {accountsWithStats.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: '0.75rem',
+            padding: '0.75rem 0',
+            borderTop: '1px solid #e5e7eb',
+            borderBottom: '1px solid #e5e7eb',
+            marginBottom: '1rem'
+          }}
+        >
+          <div>
+            <div className="small text-muted">Összes tőke</div>
+            <div style={{ fontWeight: 600 }}>
+              {totals.capital.toLocaleString('hu-HU', {
+                maximumFractionDigits: 0
+              })}{' '}
+              Ft
+            </div>
+          </div>
+          <div>
+            <div className="small text-muted">Aktuális érték</div>
+            <div style={{ fontWeight: 600 }}>
+              {totals.current.toLocaleString('hu-HU', {
+                maximumFractionDigits: 0
+              })}{' '}
+              Ft
+            </div>
+          </div>
+          <div>
+            <div className="small text-muted">Bruttó hozam</div>
+            <div
+              className={
+                totals.profit >= 0 ? 'amount-positive' : 'amount-negative'
+              }
+            >
+              {totals.profit.toLocaleString('hu-HU', {
+                maximumFractionDigits: 0
+              })}{' '}
+              Ft
+            </div>
+          </div>
+          <div>
+            <div className="small text-muted">Hozam%</div>
+            <div
+              className={
+                totals.profit >= 0 ? 'amount-positive' : 'amount-negative'
+              }
+            >
+              {totals.profitPct.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Számlák listája */}
       {accountsWithStats.length === 0 ? (
         <div className="small text-muted">
@@ -435,6 +566,35 @@ export default function Savings({ householdId }) {
               return (
                 <li className="list-item" key={acc.id}>
                   <div style={{ flex: 1, marginRight: '0.5rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.25rem',
+                        marginBottom: '0.35rem'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => moveAccount(acc.id, 'up')}
+                        disabled={
+                          orderedAccounts.findIndex(a => a.id === acc.id) === 0
+                        }
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => moveAccount(acc.id, 'down')}
+                        disabled={
+                          orderedAccounts.findIndex(a => a.id === acc.id) ===
+                          orderedAccounts.length - 1
+                        }
+                      >
+                        ↓
+                      </button>
+                    </div>
                     <input
                       className="input"
                       placeholder="Név"
@@ -549,6 +709,35 @@ export default function Savings({ householdId }) {
                   >
                     {acc.name || 'Névtelen megtakarítás'}
                   </button>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.25rem',
+                      margin: '0.35rem 0'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => moveAccount(acc.id, 'up')}
+                      disabled={
+                        orderedAccounts.findIndex(a => a.id === acc.id) === 0
+                      }
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => moveAccount(acc.id, 'down')}
+                      disabled={
+                        orderedAccounts.findIndex(a => a.id === acc.id) ===
+                        orderedAccounts.length - 1
+                      }
+                    >
+                      ↓
+                    </button>
+                  </div>
                   <div className="small text-muted">
                     Kezdőtőke:{' '}
                     {acc.base.toLocaleString('hu-HU', {
